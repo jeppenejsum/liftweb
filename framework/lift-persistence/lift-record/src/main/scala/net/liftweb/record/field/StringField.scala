@@ -117,6 +117,83 @@ class StringField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int
 }
 
 
+/**
+ * A Field optionally containing String content.
+ */
+class OptionalStringField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int) extends Field[Option[String], OwnerType] {
+
+  def this(rec: OwnerType, maxLength: Int, value: Option[String]) = {
+    this(rec, maxLength)
+    set(value)
+  }
+
+  def this(rec: OwnerType, value: Option[String]) = {
+    this(rec, 100)
+    set(value)
+  }
+
+  def owner = rec
+
+  def setFromAny(in: Any): Box[Option[String]] = {
+    in match {
+      case seq: Seq[_] if !seq.isEmpty => setFromAny(seq.first)
+      case (s: String) :: _ => Full(set(Some(s)))
+      case Some(s: String) => Full(set(Some(s)))
+      case Full(s: String) => Full(set(Some(s)))
+      case null | None | Empty | Failure(_, _, _) => Full(set(None))
+      case (s: String) if s.trim == "" => Full(set(None))
+      case o => Full(this.set(Some(o.toString)))
+    }
+  }
+
+  def setFromString(s: String): Box[Option[String]] = Full(set(Some(s)))
+
+  private def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))) {
+    funcName =>
+    <input type="text" maxlength={maxLength.toString}
+      name={funcName}
+      value={value.map(_.toString) getOrElse ""}
+      tabindex={tabIndex toString}/>
+  }
+
+  def toForm = {
+    uniqueFieldId match {
+      case Full(id) =>
+         <div id={id+"_holder"}><div><label for={id+"_field"}>{displayName}</label></div>{elem % ("id" -> (id+"_field"))}<lift:msg id={id}/></div>
+      case _ => <div>{elem}</div>
+    }
+
+  }
+
+  def asXHtml: NodeSeq = {
+    var el = elem
+
+    uniqueFieldId match {
+      case Full(id) =>  el % ("id" -> (id+"_field"))
+      case _ => el
+    }
+  }
+
+
+  def defaultValue = None
+
+  /**
+   * Make sure the field matches a regular expression
+   */
+  def valRegex(pat: Pattern, msg: => String)(value: Option[String]): Box[Node] = value flatMap {
+    s => pat.matcher(s).matches match {
+      case true => Empty
+      case false => Full(Text(msg))
+    }
+  }
+
+  final def toUpper(in: Option[String]): Option[String] = in.map(_.toUpperCase)
+  final def trim(in: Option[String]): Option[String] = in.map(_.trim)
+
+  def asJs = value.map(Str) getOrElse JsNull
+}
+
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

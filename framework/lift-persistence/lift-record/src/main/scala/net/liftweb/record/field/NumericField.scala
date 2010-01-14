@@ -27,14 +27,10 @@ import S._
 import Helpers._
 import JE._
 
-trait NumericField[MyType, OwnerType <: Record[OwnerType]] extends Field[MyType, OwnerType] {
+trait NumericFieldMixin {
+  self: Field[_, _] =>
 
-  private def elem = S.fmapFunc{s: List[String] => {
-      this.setFromAny(s) match {
-        case Empty => valueCouldNotBeSet = true
-        case _ =>
-      }}}{funcName => <input type="text" name={funcName} value={value.toString}
-      tabindex={tabIndex toString}/>}
+  protected def elem: Elem
 
   /**
    * Returns form input of this field
@@ -56,11 +52,43 @@ trait NumericField[MyType, OwnerType <: Record[OwnerType]] extends Field[MyType,
       case _ => el
     }
   }
+}
 
-  override def noValueErrorMessage = S.??("number.required")
+trait NumericField[MyType, OwnerType <: Record[OwnerType]] extends Field[MyType, OwnerType] with NumericFieldMixin {
+
+  protected def elem = S.fmapFunc{s: List[String] => {
+      this.setFromAny(s) match {
+        case Empty => valueCouldNotBeSet = true
+        case _ =>
+      }}}{funcName => <input type="text" name={funcName} value={value.toString}
+      tabindex={tabIndex toString}/>}
 
   def asJs = JsRaw(String.valueOf(value))
 
+  override def noValueErrorMessage = S.??("number.required")
+}
+
+
+trait OptionalNumericField[MyType, OwnerType <: Record[OwnerType]] extends Field[Option[MyType], OwnerType] with NumericFieldMixin {
+  protected def elem = {
+    def handleInput(s: List[String]): Unit = s match {
+      case s::_ if s.trim == "" => set(None)
+      case other => setFromAny(other) match {
+        case Empty => valueCouldNotBeSet = true
+        case _ => ()
+      }
+    }
+
+    S.fmapFunc(handleInput _) {
+      funcName => <input type="text" name={funcName} value={value.toString} tabindex={tabIndex toString}/>
+    }
+  }
+
+  def asJs = value.map(v => JsRaw(String.valueOf(v))) getOrElse JsNull
+
+  def defaultValue = None
+
+  override def noValueErrorMessage = S.??("number.required")
 }
 
 }

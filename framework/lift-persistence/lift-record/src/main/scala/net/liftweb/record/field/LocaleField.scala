@@ -62,6 +62,46 @@ class LocaleField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends String
   }
 }
 
+
+class OptionalLocaleField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends OptionalStringField(rec, 16) {
+
+  def isAsLocale: Locale = Locale.getAvailableLocales.filter(_.toString == value).toList match {
+    case Nil => Locale.getDefault
+    case x :: xs => x
+  }
+
+  private def elem = {
+    val displayList = 
+      ("", S.??("no.selection")) ::
+      Locale.getAvailableLocales.
+      toList.sort(_.getDisplayName < _.getDisplayName).
+      map(lo => (lo.toString, lo.getDisplayName))
+
+    SHtml.select(displayList, Full(value getOrElse ""), s => set(if (s == "") None else Some(s))) %
+      ("tabindex" -> tabIndex.toString)
+  }
+
+
+  override def toForm = {
+    var el = elem
+
+    uniqueFieldId match {
+      case Full(id) =>
+        <div id={id+"_holder"}><div><label for={id+"_field"}>{displayName}</label></div>{el % ("id" -> (id+"_field"))}<lift:msg id={id}/></div>
+      case _ => <div>{el}</div>
+    }
+  }
+
+  override def asXHtml: NodeSeq = {
+    var el = elem
+
+    uniqueFieldId match {
+      case Full(id) =>  el % ("id" -> (id+"_field"))
+      case _ => el
+    }
+  }
+}
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

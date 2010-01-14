@@ -25,16 +25,19 @@ import net.liftweb.http.{S}
 import S._
 import Helpers._
 
-class TextareaField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int) extends StringField(rec, maxLength) {
+trait TextareaFieldMixin {
+  self: Field[_, _] =>
 
-  private def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))){
+  def valueOption: Option[String]
+
+  protected def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))){
     funcName => <textarea name={funcName}
       rows={textareaRows.toString}
       cols={textareaCols.toString}
-      tabindex={tabIndex toString}>{value match {case null => "" case s => s.toString}}</textarea>
+      tabindex={tabIndex toString}>{valueOption match {case Some(null)|None => "" case Some(s) => s.toString}}</textarea>
   }
 
-  override def toForm = {
+  protected def _toForm = {
     var el = elem
 
     uniqueFieldId match {
@@ -45,7 +48,7 @@ class TextareaField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: I
 
   }
 
-  override def asXHtml: NodeSeq = {
+  protected def _asXHtml: NodeSeq = {
     var el = elem
 
     uniqueFieldId match {
@@ -54,16 +57,28 @@ class TextareaField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: I
     }
   }
 
-
-  override def toString = {
-    if (value == null || value.length < 100) super.toString
-    else value.substring(0,40) + " ... " + value.substring(value.length - 40)
+  override def toString = valueOption match {
+    case Some(s) if s == null || s.length < 100 => super.toString
+    case None => super.toString
+    case Some(longValue) => longValue.substring(0,40) + " ... " + longValue.substring(longValue.length - 40)
   }
 
   def textareaRows  = 8
 
   def textareaCols = 20
+}
 
+class TextareaField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int) extends StringField(rec, maxLength) with TextareaFieldMixin {
+  def valueOption = Some(value)
+  override def asXHtml = _asXHtml
+  override def toForm = _toForm
+}
+
+
+class OptionalTextareaField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int) extends OptionalStringField(rec, maxLength) with TextareaFieldMixin {
+  def valueOption = value
+  override def asXHtml = _asXHtml
+  override def toForm = _toForm
 }
 
 import _root_.java.sql.{ResultSet, Types}

@@ -55,6 +55,31 @@ class EmailField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int)
 }
 
 
+class OptionalEmailField[OwnerType <: Record[OwnerType]](rec: OwnerType, maxLength: Int) extends OptionalStringField[OwnerType](rec, maxLength) {
+
+  def this(rec: OwnerType, maxLength: Int, value: Option[String]) = {
+    this(rec, maxLength)
+    set(value)
+  }
+
+  def this(rec: OwnerType, value: Option[String]) = {
+    this(rec, 100)
+    set(value)
+  }
+
+  private def validateEmail(email: Option[String]): Box[Node] =
+    email.flatMap {
+      e => EmailField.validEmailAddr_?(e) match {
+        case false => Full(Text(S.??("invalid.email.address")))
+        case _ => Empty
+      }
+    }
+
+  override def validators = validateEmail _ :: Nil
+
+}
+
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

@@ -51,6 +51,32 @@ class PostalCodeField[OwnerType <: Record[OwnerType]](rec: OwnerType, country: C
 
 }
 
+
+class OptionalPostalCodeField[OwnerType <: Record[OwnerType]](rec: OwnerType, country: CountryField[OwnerType]) extends OptionalStringField(rec, 32) {
+
+  override def setFilter = toUpper _ :: trim _ :: super.setFilter
+
+  private def genericCheck(zip: String): Box[Node] = {
+    zip match {
+      case null => Full(Text(S.??("invalid.postal.code")))
+      case s if s.length < 3 => Full(Text(S.??("invalid.postal.code")))
+      case _ => Empty
+    }
+  }
+
+  def validate(in : Option[String]): Box[Node] =
+    country.value match {
+      case Countries.USA => valRegex(_root_.java.util.regex.Pattern.compile("[0-9]{5}(\\-[0-9]{4})?"), S.??("invalid.zip.code"))(in)
+      case Countries.Sweden => valRegex(_root_.java.util.regex.Pattern.compile("[0-9]{3}[ ]?[0-9]{2}"), S.??("invalid.postal.code"))(in)
+      case Countries.Australia => valRegex(_root_.java.util.regex.Pattern.compile("(0?|[1-9])[0-9]{3}"), S.??("invalid.postal.code"))(in)
+      case Countries.Canada => valRegex(_root_.java.util.regex.Pattern.compile("[A-Z][0-9][A-Z][ ][0-9][A-Z][0-9]"), S.??("invalid.postal.code"))(in)
+      case _ => genericCheck(country.value.toString)
+    }
+
+  override def validators = validate _ :: Nil
+
+}
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

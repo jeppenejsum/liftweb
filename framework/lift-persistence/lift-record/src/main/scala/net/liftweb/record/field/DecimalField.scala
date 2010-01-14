@@ -101,6 +101,74 @@ class DecimalField[OwnerType <: Record[OwnerType]](rec: OwnerType, val context :
   protected def setAll (in : BigDecimal) = this.set(new BigDecimal(in.bigDecimal.setScale(scale, context.getRoundingMode)))
 }
 
+
+/**
+ * <p>
+ * A field that maps to a optional/nullable decimal value. Decimal precision and rounding
+ * are controlled via the context parameter. The default value is zero.
+ * </p>
+ *
+ * @param rec The Record that owns this field
+ * @param context The MathContext that controls precision and rounding
+ * @param scale Controls the scale of the underlying BigDecimal
+ */
+class OptionalDecimalField[OwnerType <: Record[OwnerType]](rec: OwnerType, val context : MathContext, val scale : Int) extends OptionalNumericField[BigDecimal, OwnerType] {
+
+  /**
+   * Constructs a DecimalField with the specified initial value and context.
+   * The scale must be provided separately since the given value may be None
+   *
+   * @param rec The Record that owns this field
+   * @param value The initial value
+   * @param context The MathContext that controls precision and rounding
+   * @param scale The scale of the decimal (number digits after the decimal)
+   */
+  def this(rec : OwnerType, value : Option[BigDecimal], context : MathContext, scale : Int) = {
+    this(rec, context, scale)
+    setFromAny(value)
+  }
+
+  /**
+   * Constructs a DecimalField with the specified initial value. The context
+   * is set to MathContext.UNLIMITED.
+   * The scale must be provided separately since the given value may be None
+   *
+   * @param rec The Record that owns this field
+   * @param value The initial value
+   * @param scale The scale of the decimal (number digits after the decimal)
+   */
+  def this(rec : OwnerType, value : Option[BigDecimal], scale : Int) = {
+    this(rec, MathContext.UNLIMITED, scale)
+    setFromAny(value)
+  }
+
+  private val zero = BigDecimal("0")
+
+  def owner = rec
+
+  def setFromAny (in : Any) : Box[Option[BigDecimal]] =
+    in match {
+      case n :: _ => setFromString(n.toString)
+      case Some(n) => setFromString(n.toString)
+      case Full(n) => setFromString(n.toString)
+      case null | None | Empty | Failure(_, _, _) => Full(set(None))
+      case n => setFromString(n.toString)
+    }
+
+  def setFromString (s : String) : Box[Option[BigDecimal]] = {
+    try {
+      Full(this.setAll(BigDecimal(s)))
+    } catch {
+      case e: Exception => valueCouldNotBeSet = true; Empty
+    }
+  }
+
+  /** Set the value along with proper scale, precision, and rounding */
+  protected def setAll (in : BigDecimal): Option[BigDecimal] =
+      this.set(Some(new BigDecimal(in.bigDecimal.setScale(scale, context.getRoundingMode))))
+}
+
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

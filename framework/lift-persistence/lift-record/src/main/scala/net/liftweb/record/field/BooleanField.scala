@@ -27,7 +27,31 @@ import Helpers._
 import S._
 import JE._
 
-class BooleanField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[Boolean, OwnerType] {
+trait BooleanFieldMixin {
+  self: Field[_, _] =>
+
+  protected def valueOption: Option[Boolean]
+
+  // FIXME? Right now the control is only emitted as a plain checkbox and so can never represent None (null)
+  private def elem(id: Option[String]): NodeSeq = {
+    val attrs = ("tabIndex" -> tabIndex.toString) :: (id.map(s => ("id" -> s)::Nil) getOrElse Nil)
+    SHtml.checkbox(valueOption getOrElse false, (b: Boolean) => this.setFromAny(Some(b)), attrs: _*)
+  }
+
+  def toForm = {
+    uniqueFieldId match {
+      case Full(id) =>
+        <div id={id+"_holder"}><div><label
+              for={id+"_field"}>{displayName}</label></div>{ elem(Some(id+"_field")) }<lift:msg id={id}/></div>
+      case _ => <div>{ elem(None) }</div>
+    }
+
+  }
+
+  def asXHtml: NodeSeq = elem(uniqueFieldId.map(_ + "_field"))
+}
+
+class BooleanField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[Boolean, OwnerType] with BooleanFieldMixin {
   def owner = rec
 
   def this(rec: OwnerType, value: Boolean) = {
@@ -60,34 +84,55 @@ class BooleanField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field
     }
   }
 
-  private def elem = SHtml.checkbox(value, this.set _, "tabIndex" -> tabIndex.toString)
-
-  def toForm = {
-    //var el = elem
-    uniqueFieldId match {
-      case Full(id) =>
-        <div id={id+"_holder"}><div><label
-              for={id+"_field"}>{displayName}</label></div>{SHtml.checkbox(value, this.set _, "tabIndex" -> tabIndex.toString, "id" -> (id+"_field"))}<lift:msg id={id}/></div>
-      case _ => <div>{elem}</div>
-    }
-
-  }
-
-  def asXHtml: NodeSeq = {
-
-    uniqueFieldId match {
-      case Full(id) => SHtml.checkbox(value, this.set _,
-                                      "tabIndex" -> tabIndex.toString,
-                                      "id" -> (id+"_field"))
-      case _ => elem
-    }
-  }
-
+  protected def valueOption = Some(value)
 
   def defaultValue = false
 
   def asJs: JsExp = value
 
+}
+
+
+class OptionalBooleanField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[Option[Boolean], OwnerType] with BooleanFieldMixin {
+  def owner = rec
+
+  def this(rec: OwnerType, value: Option[Boolean]) = {
+    this(rec)
+    set(value)
+  }
+
+  /**
+   * Sets the field value from an Any
+   */
+  def setFromAny(in: Any): Box[Option[Boolean]] = {
+    in match {
+      case (b: Boolean) => Full(this.set(Some(b)))
+      case (b: Boolean) :: _ => Full(this.set(Some(b)))
+      case Some(b: Boolean) => Full(this.set(Some(b)))
+      case Full(b: Boolean) => Full(this.set(Some(b)))
+      case null | Empty | Failure(_, _, _) | None => Full(this.set(None))
+      case (s: String) :: _ => Full(this.set(Some(toBoolean(s))))
+      case o => Full(this.set(Some(toBoolean(o))))
+    }
+  }
+
+  def setFromString(s: String): Box[Option[Boolean]] = {
+    try{
+      Full(set(Some(java.lang.Boolean.parseBoolean(s))))
+    } catch {
+      case e: Exception => Empty
+    }
+  }
+
+  protected def valueOption = value
+
+  def defaultValue = None
+
+  def asJs: JsExp = value match {
+    case None         => JsNull
+    case Some(b) if b => JsTrue
+    case _            => JsFalse
+  }
 }
 
 import _root_.java.sql.{ResultSet, Types}

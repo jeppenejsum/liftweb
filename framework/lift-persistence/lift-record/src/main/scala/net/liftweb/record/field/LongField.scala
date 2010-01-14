@@ -59,6 +59,36 @@ class LongField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends NumericF
 
 }
 
+
+class OptionalLongField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends OptionalNumericField[Long, OwnerType] {
+
+  def owner = rec
+
+  /**
+   * Sets the field value from an Any
+   */
+  def setFromAny(in: Any): Box[Option[Long]] = {
+    in match {
+      case (n: Int) => Full(this.set(Some(n)))
+      case (n: Number) => Full(this.set(Some(n.longValue)))
+      case (n: Number) :: _ => Full(this.set(Some(n.longValue)))
+      case Some(n: Number) => Full(this.set(Some(n.longValue)))
+      case Full(n: Number) => Full(this.set(Some(n.longValue)))
+      case null | None | Empty | Failure(_, _, _) => Full(this.set(None))
+      case (s: String) :: _ => setFromString(s)
+      case o => setFromString(o.toString)
+    }
+  }
+
+  def setFromString(s: String): Box[Option[Long]] = {
+    try{
+      Full(set(Some(java.lang.Long.parseLong(s))));
+    } catch {
+      case (e: Exception) => valueCouldNotBeSet = true; Empty
+    }
+  }
+}
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

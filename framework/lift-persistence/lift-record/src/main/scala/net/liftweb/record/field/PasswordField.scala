@@ -34,33 +34,14 @@ object PasswordField {
 }
 
 
-class PasswordField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[String, OwnerType] {
+trait PasswordFieldMixin {
+  self: Field[_, _] =>
 
-  private val salt_i = FatLazy(Safe.randomString(16))
-  private var invalidMsg : String = ""
-
-  def owner = rec
+  protected def elem: Elem
+  protected val salt_i = FatLazy(Safe.randomString(16))
+  protected var invalidMsg : String = ""
 
   def salt = this.salt_i
-
-  override def set_!(in: String) = hash("{"+in+"} salt={"+salt_i.get+"}")
-
-  def setFromAny(in: Any): Box[String] = {
-    in match {
-      case a : Array[String] if (a.length == 2 && a(0) == a(1)) => Full(this.set(a(0)))
-      case l : List[String] if (l.length == 2 && l.head == l(1)) => Full(this.set(l.head))
-      case s : String  => Full(this.set(s))
-      case o @ _ => Full(this.set(o.toString))
-    }
-  }
-
-  def setFromString(s: String): Box[String] = Full(set(s))
-
-  private def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))){
-    funcName => <input type="pasword"
-      name={funcName}
-      value={value match {case null => "" case s => s.toString}}
-      tabindex={tabIndex toString}/>}
 
   def toForm = {
     uniqueFieldId match {
@@ -80,17 +61,77 @@ class PasswordField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Fiel
     }
   }
 
-  private def validatePassword(pwd: String): Box[Node] = pwd match {
+  protected def validatePassword(pwd: String): Box[Node] = pwd match {
     case "*" | PasswordField.blankPw if (pwd.length < 3) => Full(Text(S.??("password.too.short")))
     case "" | null => Full(Text(S.??("password.must.be.set")))
     case _ => Empty
   }
+}
+
+
+class PasswordField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[String, OwnerType] with PasswordFieldMixin {
+  def owner = rec
+
+  override def set_!(in: String) = hash("{"+in+"} salt={"+salt_i.get+"}")
+
+  def setFromAny(in: Any): Box[String] = {
+    in match {
+      case a : Array[String] if (a.length == 2 && a(0) == a(1)) => Full(this.set(a(0)))
+      case l : List[String] if (l.length == 2 && l.head == l(1)) => Full(this.set(l.head))
+      case s : String  => Full(this.set(s))
+      case o @ _ => Full(this.set(o.toString))
+    }
+  }
+
+  def setFromString(s: String): Box[String] = Full(set(s))
+
+  protected def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))){
+    funcName => <input type="password"
+      name={funcName}
+      value={value match { case null => "" case s => s }}
+      tabindex={tabIndex toString}/>}
+
 
   override def validators = validatePassword _ :: Nil
 
   def defaultValue = ""
 
   def asJs = Str(value)
+
+}
+
+
+class OptionalPasswordField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[Option[String], OwnerType] with PasswordFieldMixin{
+  def owner = rec
+
+  override def set_!(in: Option[String]) = in.map(s => hash("{"+s+"} salt={"+salt_i.get+"}"))
+
+  def setFromAny(in: Any): Box[Option[String]] = {
+    in match {
+      case Some(s: String) => Full(this.set(Some(s)))
+      case Full(s: String) => Full(this.set(Some(s)))
+      case a : Array[String] if (a.length == 2 && a(0) == a(1)) => Full(this.set(Some(a(0))))
+      case l : List[String] if (l.length == 2 && l.head == l(1)) => Full(this.set(Some(l.head)))
+      case null|None|Empty|Failure(_,_,_) => Full(this.set(None))
+      case (s : String) if s.trim == "" => Full(this.set(None))
+      case o => Full(this.set(Some(o.toString)))
+    }
+  }
+
+  def setFromString(s: String): Box[Option[String]] = Full(set(Some(s)))
+
+  protected def elem = S.fmapFunc(SFuncHolder(this.setFromAny(_))){
+    funcName => <input type="password"
+      name={funcName}
+      value={value getOrElse ""}
+      tabindex={tabIndex toString}/>}
+
+
+  override def validators = ((value: Option[String]) => value.map(validatePassword) getOrElse Empty) :: Nil
+
+  def defaultValue = None
+
+  def asJs = value.map(Str) getOrElse JsNull
 
 }
 

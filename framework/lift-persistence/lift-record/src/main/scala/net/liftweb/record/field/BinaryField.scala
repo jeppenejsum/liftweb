@@ -64,6 +64,48 @@ class BinaryField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[
 
 }
 
+
+class OptionalBinaryField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Field[Option[Array[Byte]], OwnerType] {
+  def owner = rec
+
+  def this(rec: OwnerType, value: Option[Array[Byte]]) = {
+    this(rec)
+    set(value)
+  }
+
+  /**
+   * Sets the field value from an Any
+   */
+  def setFromAny(f: Any): Box[Option[Array[Byte]]] = Full(this.set(
+    f match {
+      case null => None
+      case (arr : Array[Byte]) => Some(f.asInstanceOf[Array[Byte]])
+      case Some(arr : Array[Byte]) => Some(arr)
+      case Full(arr : Array[Byte]) => Some(arr)
+      case None|Empty|Failure(_,_,_) => None
+      case _ => Some(f.toString.getBytes("UTF-8"))
+    }))
+
+  def setFromString(s: String): Box[Option[Array[Byte]]] = {
+    try{
+      Full(set(Some(s.getBytes("UTF-8"))))
+    } catch {
+      case (e: Exception) => Empty
+    }
+  }
+
+  def toForm = NodeSeq.Empty
+
+  def asXHtml: NodeSeq = NodeSeq.Empty
+
+  def defaultValue = None
+
+  def asJs = value match {
+    case Some(arr) => Str(hexEncode(arr))
+    case None      => JsNull
+  }
+}
+
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
 

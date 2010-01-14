@@ -33,19 +33,13 @@ object TimeZoneField {
     sort(_ < _).map(tz => (tz, tz))
 }
 
-class TimeZoneField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends StringField(rec, 32) {
+trait TimeZoneFieldMixin {
+  self: Field[_, _] =>
 
-  override def defaultValue = TimeZone.getDefault.getID
+  protected def _elem: Elem
 
-  def isAsTimeZone: TimeZone = TimeZone.getTimeZone(value) match {
-    case null => TimeZone.getDefault
-    case x => x
-  }
-
-  private def elem = SHtml.select(TimeZoneField.timeZoneList, Full(value), set) % ("tabindex" -> tabIndex.toString)
-
-  override def toForm = {
-    var el = elem
+  protected def _toForm = {
+    var el = _elem
 
     uniqueFieldId match {
       case Full(id) =>
@@ -54,8 +48,8 @@ class TimeZoneField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Stri
     }
   }
 
-  override def asXHtml: NodeSeq = {
-    var el = elem
+  protected def _asXHtml: NodeSeq = {
+    var el = _elem
 
     uniqueFieldId match {
       case Full(id) => el % ("id" -> (id+"_field"))
@@ -63,6 +57,39 @@ class TimeZoneField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends Stri
     }
   }
 }
+
+
+class TimeZoneField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends StringField(rec, 32) with TimeZoneFieldMixin {
+  override def defaultValue = TimeZone.getDefault.getID
+
+  def isAsTimeZone: TimeZone = TimeZone.getTimeZone(value) match {
+    case null => TimeZone.getDefault
+    case x => x
+  }
+
+  protected def _elem =
+    SHtml.select(TimeZoneField.timeZoneList, Full(value), set) % ("tabindex" -> tabIndex.toString)
+
+  override def asXHtml = _asXHtml
+  override def toForm = _toForm
+}
+
+
+class OptionalTimeZoneField[OwnerType <: Record[OwnerType]](rec: OwnerType) extends OptionalStringField(rec, 32) with TimeZoneFieldMixin {
+
+  def isAsTimeZone: Option[TimeZone] = value.map(s => TimeZone.getTimeZone(s) match {
+    case null => TimeZone.getDefault
+    case x => x
+  })
+
+  protected def _elem =
+    SHtml.select(("", S.??("no.selection")) :: TimeZoneField.timeZoneList, Full(value getOrElse ""), 
+                 s => if (s.trim == "") None else Some(s)) % ("tabindex" -> tabIndex.toString)
+
+  override def asXHtml = _asXHtml
+  override def toForm = _toForm
+}
+
 
 import _root_.java.sql.{ResultSet, Types}
 import _root_.net.liftweb.mapper.{DriverType}
