@@ -49,8 +49,9 @@
     ~ Modules Setting
   -->
   <modules>
-    <module>lift-mapper</module>
+    <module>lift-couchdb</module>
     <module>lift-jpa</module>
+    <module>lift-mapper</module>
     <module>lift-record</module>
   </modules>
 
